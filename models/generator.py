@@ -1,8 +1,31 @@
 import tensorflow as tf
 from tensorflow import keras
-from component import GenerativeBasis, UpsampleLayer, ResidualBlock, MSRInitializer, Convolution
+from component import UpsampleLayer, ResidualBlock, MSRInitializer, Convolution
 
-class GeneratorStage(keras.Model):
+class GenerativeBasis(keras.layers.Layer):
+    def __init__(self, output_channels, dtype=tf.float32):
+        super().__init__()
+        self.basis = self.add_weight(
+            shape=(output_channels, 4, 4),
+            initializer=tf.random_normal_initializer(mean=0., stddev=1.),
+            trainable=True,
+            name="basis",
+            dtype=dtype
+        )
+        self.linear = keras.layers.Dense(
+            output_channels, use_bias=False, dtype=dtype,
+            kernel_initializer=MSRInitializer()
+        )
+
+    def call(self, x):
+        batch_size = tf.shape(x)[0]
+        linear_out = self.linear(x)
+        linear_out = tf.reshape(linear_out, (batch_size, -1, 1, 1))
+        basis = tf.expand_dims(self.basis, axis=0)
+
+        return basis * linear_out
+
+class GeneratorStage(keras.layers.Layer):
     def __init__(
         self,
         input_channels,
