@@ -1,6 +1,16 @@
 import tensorflow as tf
 from tensorflow import keras
 import math
+import numpy as np
+
+def create_lowpass_kernel(weights, inplace):
+    if inplace:
+        kernel = np.array([weights])
+    else:
+        kernel = np.convolve(weights, [1, 1]).reshape(1, -1)
+    kernel = np.matmul(kernel.T, kernel)
+    kernel = tf.convert_to_tensor(kernel, dtype=tf.float32)
+    return kernel / tf.reduce_sum(kernel)
 
 class MSRInitializer(tf.keras.initializers.Initializer):
     def __init__(self, gain=1.0):
