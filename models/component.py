@@ -12,6 +12,163 @@ def create_lowpass_kernel(weights, inplace):
     kernel = tf.convert_to_tensor(kernel, dtype=tf.float32)
     return kernel / tf.reduce_sum(kernel)
 
+class InterpolativeUpsampler(keras.layers.Layer):
+    def __init__(self, filter_weights):
+        super().__init__()
+        self.kernel = create_lowpass_kernel(filter_weights, inplace=False)
+        self.filter_radius = len(filter_weights) // 2
+
+    def call(self, x):
+        # x: (batch, channels, height, width) -> TensorFlow expects (batch, height, width, channels)
+        x = tf.transpose(x, [0, 2, 3, 1])
+        
+        batch_size, height, width, channels = tf.unstack(tf.shape(x))
+        x_reshaped = tf.reshape(x, [batch_size * channels, height, width, 1])
+        
+        # Create kernel with correct shape for conv_transpose2d: (h, w, output_channels, input_channels)
+        kernel = 4 * tf.expand_dims(tf.expand_dims(self.kernel, -1), -1)  # (h, w, 1, 1)
+        kernel = tf.cast(kernel, x.dtype)
+        
+        # Apply padding manually to match PyTorch's padding behavior
+        padded_x = tf.pad(x_reshaped, 
+                         [[0, 0], [self.filter_radius, self.filter_radius], 
+                          [self.filter_radius, self.filter_radius], [0, 0]], 
+                         "CONSTANT")
+        
+        # Transposed convolution with stride 2
+        y = tf.nn.conv2d_transpose(
+            padded_x, 
+            kernel,
+            output_shape=[batch_size * channels, height * 2, width * 2, 1],
+            strides=[1, 2, 2, 1],
+            padding='VALID'
+        )
+        
+        # Reshape back to original batch structure
+        y = tf.reshape(y, [batch_size, height * 2, width * 2, channels])
+        y = tf.transpose(y, [0, 3, 1, 2])  # Back to (batch, channels, height, width)
+        return y
+
+class InterpolativeDownsampler(keras.layers.Layer):
+    def __init__(self, filter_weights):
+        super().__init__()
+        self.kernel = create_lowpass_kernel(filter_weights, inplace=False)
+        self.filter_radius = len(filter_weights) // 2
+
+    def call(self, x):
+        # x: (batch, channels, height, width) -> TensorFlow expects (batch, height, width, channels)
+        x = tf.transpose(x, [0, 2, 3, 1])
+        
+        batch_size, height, width, channels = tf.unstack(tf.shape(x))
+        x_reshaped = tf.reshape(x, [batch_size * channels, height, width, 1])
+        
+        # Create kernel with correct shape: (h, w, input_channels, output_channels)
+        kernel = tf.expand_dims(tf.expand_dims(self.kernel, -1), -1)  # (h, w, 1, 1)
+        kernel = tf.cast(kernel, x.dtype)
+        
+        # Apply padding manually
+        padded_x = tf.pad(x_reshaped,
+                         [[0, 0], [self.filter_radius, self.filter_radius],
+                          [self.filter_radius, self.filter_radius], [0, 0]],
+                         "CONSTANT")
+        
+        # Convolution with stride 2
+        y = tf.nn.conv2d(
+            padded_x,
+            kernel,
+            strides=[1, 2, 2, 1],
+            padding='VALID'
+        )
+        
+        # Reshape back to original batch structure
+        y = tf.reshape(y, [batch_size, height // 2, width // 2, channels])
+        y = tf.transpose(y, [0, 3, 1, 2])  # Back to (batch, channels, height, width)
+        return y
+
+class InplaceUpsampler(keras.layers.Layer):
+    def __init__(self, filter_weights):
+        super().__init__()
+        self.kernel = create_lowpass_kernel(filter_weights, inplace=True)
+        self.filter_radius = len(filter_weights) // 2
+
+    def call(self, x):
+        # x: (batch, channels, height, width)
+        # First apply pixel shuffle (equivalent to PyTorch's pixel_shuffle)
+        # PyTorch pixel_shuffle expects (N, C*r^2, H, W) -> (N, C, H*r, W*r)
+        # We need to rearrange channels first
+        
+        batch_size, channels, height, width = tf.unstack(tf.shape(x))
+        
+        # Rearrange for pixel shuffle: (batch, channels, height, width) -> (batch, height, width, channels)
+        x = tf.transpose(x, [0, 2, 3, 1])
+        
+        # Apply depth_to_space (equivalent to pixel_shuffle with upscale_factor=2)
+        x = tf.nn.depth_to_space(x, 2)  # (batch, height*2, width*2, channels//4)
+        
+        # Now apply convolution
+        new_height, new_width, new_channels = x.shape[1], x.shape[2], tf.shape(x)[3]
+        x_reshaped = tf.reshape(x, [batch_size * new_channels, new_height, new_width, 1])
+        
+        kernel = tf.expand_dims(tf.expand_dims(self.kernel, -1), -1)
+        kernel = tf.cast(kernel, x.dtype)
+        
+        # Apply padding
+        padded_x = tf.pad(x_reshaped,
+                         [[0, 0], [self.filter_radius, self.filter_radius],
+                          [self.filter_radius, self.filter_radius], [0, 0]],
+                         "CONSTANT")
+        
+        y = tf.nn.conv2d(
+            padded_x,
+            kernel,
+            strides=[1, 1, 1, 1],
+            padding='VALID'
+        )
+        
+        # Reshape back
+        y = tf.reshape(y, [batch_size, new_height, new_width, new_channels])
+        y = tf.transpose(y, [0, 3, 1, 2])  # Back to (batch, channels, height, width)
+        return y
+
+class InplaceDownsampler(keras.layers.Layer):
+    def __init__(self, filter_weights):
+        super().__init__()
+        self.kernel = create_lowpass_kernel(filter_weights, inplace=True)
+        self.filter_radius = len(filter_weights) // 2
+
+    def call(self, x):
+        # x: (batch, channels, height, width)
+        x = tf.transpose(x, [0, 2, 3, 1])  # -> (batch, height, width, channels)
+        
+        batch_size, height, width, channels = tf.unstack(tf.shape(x))
+        x_reshaped = tf.reshape(x, [batch_size * channels, height, width, 1])
+        
+        kernel = tf.expand_dims(tf.expand_dims(self.kernel, -1), -1)
+        kernel = tf.cast(kernel, x.dtype)
+        
+        # Apply padding
+        padded_x = tf.pad(x_reshaped,
+                         [[0, 0], [self.filter_radius, self.filter_radius],
+                          [self.filter_radius, self.filter_radius], [0, 0]],
+                         "CONSTANT")
+        
+        # Convolution with stride 1
+        y = tf.nn.conv2d(
+            padded_x,
+            kernel,
+            strides=[1, 1, 1, 1],
+            padding='VALID'
+        )
+        
+        # Reshape back to batch structure
+        y = tf.reshape(y, [batch_size, height, width, channels])
+        
+        # Apply pixel unshuffle (equivalent to PyTorch's pixel_unshuffle)
+        # space_to_depth with block_size=2
+        y = tf.nn.space_to_depth(y, 2)  # (batch, height//2, width//2, channels*4)
+        
+        y = tf.transpose(y, [0, 3, 1, 2])  # Back to (batch, channels, height, width)
+        return y
 class MSRInitializer(tf.keras.initializers.Initializer):
     def __init__(self, gain=1.0):
         self.gain = gain
