@@ -121,3 +121,30 @@ class ResidualBlock(keras.layers.Layer):
         y = self.conv3(self.biasact2(y))
         
         return x + y
+class UpsampleLayer(keras.layers.Layer):
+    def __init__(self, input_channels, output_channels, resampling_filter):
+        super().__init__()
+        self.resampler = InterpolativeUpsampler(resampling_filter)
+        self.use_projection = input_channels != output_channels
+        if self.use_projection:
+            self.linear_layer = Convolution(input_channels, output_channels, kernel_size=1)
+
+    def call(self, x):
+        if self.use_projection:
+            x = self.linear_layer(x)
+        x = self.resampler(x)
+        return x
+
+class DownsampleLayer(keras.layers.Layer):
+    def __init__(self, input_channels, output_channels, resampling_filter):
+        super().__init__()
+        self.resampler = InterpolativeDownsampler(resampling_filter)
+        self.use_projection = input_channels != output_channels
+        if self.use_projection:
+            self.linear_layer = Convolution(input_channels, output_channels, kernel_size=1)
+
+    def call(self, x):
+        x = self.resampler(x)
+        if self.use_projection:
+            x = self.linear_layer(x)
+        return x
