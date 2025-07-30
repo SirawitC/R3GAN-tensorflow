@@ -16,6 +16,7 @@ CONDITION_EMBEDDING_DIM_D = WIDTH_PER_STAGE_G[0]
 
 # Training Hyperparameters
 NUM_EPOCHS = 1000
+BATCH_SIZE = 4
 LR_G = 1e-8
 LR_D = 1e-8
 

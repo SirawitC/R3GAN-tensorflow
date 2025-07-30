@@ -2,6 +2,7 @@ import tensorflow as tf
 from trainer import AdversarialTrainer
 from models.generator import Generator
 from models.discriminator import Discriminator
+from tensorflow.keras.datasets import cifar10
 from configs.config import *
 
 @tf.function
@@ -25,7 +26,19 @@ d_optimizer = tf.keras.optimizers.Adam(LR_D, BETA_1, BETA_2)
 
 trainer = AdversarialTrainer(generator, discriminator, g_optimizer, d_optimizer)
 
-######## TODO: load the appropriate train_dataset #########
+# Load CIFAR-10
+(x_train, y_train), (_, _) = cifar10.load_data()
+
+# Normalize to [-1, 1]
+x_train = (x_train.astype("float32") / 127.5) - 1.0
+
+# One-hot encode the labels
+y_train = tf.keras.utils.to_categorical(y_train, CONDITION_DIM)
+
+train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
+
+train_dataset = train_dataset.shuffle(10000).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+
 for epoch in range(NUM_EPOCHS):
     for real_images, conditions in train_dataset:
         gen_loss, disc_loss, r1, r2 = train_step(real_images, conditions, NOISE_DIMENSION_G)
