@@ -4,7 +4,7 @@ from component import DownsampleLayer, ResidualBlock, MSRInitializer, Convolutio
 import math
 
 class DiscriminativeBasis(keras.layers.Layer):
-    def __init__(self, input_channels, output_dim, dtype=tf.float32):
+    def __init__(self, input_channels, output_dim):
         super().__init__()
 
         self.basis = keras.layers.Conv2D(
@@ -14,11 +14,11 @@ class DiscriminativeBasis(keras.layers.Layer):
             padding='valid',
             groups=input_channels,
             use_bias=False,
-            dtype=dtype,
+            dtype=tf.float32,
             kernel_initializer=MSRInitializer()
         )
         self.linear = keras.layers.Dense(
-            output_dim, use_bias=False, dtype=dtype,
+            output_dim, use_bias=False, dtype=tf.float32,
             kernel_initializer=MSRInitializer()
         )
 
@@ -38,7 +38,6 @@ class DiscriminatorStage(keras.layers.Layer):
         kernel_size,
         variance_scaling,
         resampling_filter=None,
-        dtype=tf.float32
     ):
         super().__init__()
         if resampling_filter is None:
@@ -50,10 +49,8 @@ class DiscriminatorStage(keras.layers.Layer):
             ResidualBlock(input_channels, cardinality, expansion_factor, kernel_size, variance_scaling) for _ in range(num_blocks)
         ] + [transition_layer]
 
-        self.dtype = dtype
-
     def call(self, x):
-        x = tf.cast(x, self.dtype)
+        x = tf.cast(x, tf.float32)
         for layer in self.layers:
             x = layer(x)
         return x
@@ -69,7 +66,6 @@ class Discriminator(keras.layers.Layer):
         cond_emb_dim=0,
         kernel_size=3,
         resampling_filter=[1, 2, 1],
-        dtype=tf.float32
     ):
         super().__init__()
         variance_scaling = sum(block_per_stage)
@@ -84,7 +80,7 @@ class Discriminator(keras.layers.Layer):
                 kernel_size,
                 variance_scaling,
                 resampling_filter,
-                dtype=dtype
+                dtype=tf.float32
             )
             for x in range(len(width_per_stage) - 1)
         ]
@@ -98,7 +94,7 @@ class Discriminator(keras.layers.Layer):
                 kernel_size,
                 variance_scaling,
                 None,
-                dtype=dtype
+                dtype=tf.float32
             )
         )
         self.main_layers = main_layers
@@ -106,14 +102,14 @@ class Discriminator(keras.layers.Layer):
 
         if cond_dim is not None and cond_emb_dim > 0:
             self.embedding_layer = keras.layers.Dense(
-                cond_emb_dim, use_bias=False, dtype=dtype,
+                cond_emb_dim, use_bias=False, dtype=tf.float32,
                 kernel_initializer=MSRInitializer(gain=1 / math.sqrt(cond_emb_dim))
             )
         else:
             self.embedding_layer = None
 
     def call(self, x, y=None):
-        x = self.extraction_layer(tf.cast(x, self.main_layers[0].dtype))
+        x = self.extraction_layer(tf.cast(x, tf.float32))
         for layer in self.main_layers:
             x = layer(x)
         if self.embedding_layer is not None and y is not None:
