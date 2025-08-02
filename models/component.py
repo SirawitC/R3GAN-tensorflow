@@ -19,15 +19,12 @@ class InterpolativeUpsampler(keras.layers.Layer):
         self.filter_radius = len(filter_weights) // 2
 
     def call(self, x):
-        # x: (batch, channels, height, width) -> TensorFlow expects (batch, height, width, channels)
-        x = tf.transpose(x, [0, 2, 3, 1])
-        
         batch_size, height, width, channels = tf.unstack(tf.shape(x))
         x_reshaped = tf.reshape(x, [batch_size * channels, height, width, 1])
         
         # Create kernel with correct shape for conv_transpose2d: (h, w, output_channels, input_channels)
         kernel = 4 * tf.expand_dims(tf.expand_dims(self.kernel, -1), -1)  # (h, w, 1, 1)
-        kernel = tf.cast(kernel, x.dtype)
+        kernel = tf.cast(kernel, tf.float32)
         
         # Apply padding manually to match PyTorch's padding behavior
         padded_x = tf.pad(x_reshaped, 
@@ -46,7 +43,6 @@ class InterpolativeUpsampler(keras.layers.Layer):
         
         # Reshape back to original batch structure
         y = tf.reshape(y, [batch_size, height * 2, width * 2, channels])
-        y = tf.transpose(y, [0, 3, 1, 2])  # Back to (batch, channels, height, width)
         return y
 
 class InterpolativeDownsampler(keras.layers.Layer):
