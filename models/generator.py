@@ -3,24 +3,28 @@ from tensorflow import keras
 from component import UpsampleLayer, ResidualBlock, MSRInitializer, Convolution
 
 class GenerativeBasis(keras.layers.Layer):
-    def __init__(self, output_channels, dtype=tf.float32):
+    def __init__(self, output_channels):
         super().__init__()
         self.basis = self.add_weight(
-            shape=(output_channels, 4, 4),
+            shape=(4, 4, output_channels),
             initializer=tf.random_normal_initializer(mean=0., stddev=1.),
             trainable=True,
             name="basis",
-            dtype=dtype
+            dtype=tf.float32
         )
         self.linear = keras.layers.Dense(
-            output_channels, use_bias=False, dtype=dtype,
+            output_channels, use_bias=False, dtype=tf.float32,
             kernel_initializer=MSRInitializer()
         )
 
     def call(self, x):
-        batch_size = tf.shape(x)[0]
+        # x.shape = (4, 128)
+        batch_size = tf.shape(x)[0] # 4
+        # linear_out.shape = (batch_size, output_channels) = (4, 768)
         linear_out = self.linear(x)
-        linear_out = tf.reshape(linear_out, (batch_size, -1, 1, 1))
+        # (batch_size, output_channels) = (4, 768) -> (batch_size, 1, 1, 768)
+        linear_out = tf.reshape(linear_out, (batch_size, 1, 1, -1))
+        # basis.shape = (1, 4, 4, 768)
         basis = tf.expand_dims(self.basis, axis=0)
 
         return basis * linear_out
@@ -36,12 +40,11 @@ class GeneratorStage(keras.layers.Layer):
         kernel_size,
         variance_scaling,
         resampling_filter=None,
-        dtype=tf.float32
     ):
         super().__init__()
 
         if resampling_filter is None:
-            transition_layer = GenerativeBasis(input_channels, output_channels)
+            transition_layer = GenerativeBasis(output_channels)
         else:
             transition_layer = UpsampleLayer(input_channels, output_channels, resampling_filter)
         
@@ -53,10 +56,9 @@ class GeneratorStage(keras.layers.Layer):
                     kernel_size, variance_scaling
                 )
             )
-        self.dtype = dtype
 
     def call(self, x):
-        x = tf.cast(x, self.dtype)
+        x = tf.cast(x, tf.float32)
         for layer in self.layers:
             x = layer(x)
         return x
@@ -73,25 +75,22 @@ class Generator(keras.Model):
         cond_emb_dim=0,
         kernel_size=3,
         resampling_filter=[1, 2, 1],
-        dtype=tf.float32
     ):
         super().__init__()
         self.cond_emb_dim = cond_emb_dim
         self.cond_dim = cond_dim
-        self.dtype = dtype
 
         variance_scaling = sum(block_per_stage)
         main_layers = [
             GeneratorStage(
-                noise_dim + cond_emb_dim,
-                width_per_stage[0],
-                cardinality_per_stage[0],
-                block_per_stage[0],
-                expansion_factor,
-                kernel_size,
-                variance_scaling,
+                noise_dim + cond_emb_dim, # 64 + 64
+                width_per_stage[0], # 768
+                cardinality_per_stage[0], # 96
+                block_per_stage[0], # 2
+                expansion_factor, # 2
+                kernel_size, # 3 
+                variance_scaling, # 8
                 None,
-                dtype=dtype
             )
         ]
         for x in range(len(width_per_stage) - 1):
@@ -105,7 +104,6 @@ class Generator(keras.Model):
                     kernel_size,
                     variance_scaling,
                     resampling_filter,
-                    dtype=dtype
                 )
             )
         self.main_layers = main_layers
@@ -113,7 +111,7 @@ class Generator(keras.Model):
 
         if cond_dim is not None and cond_emb_dim > 0:
             self.embedding_layer = keras.layers.Dense(
-                cond_emb_dim, use_bias=False, dtype=dtype,
+                cond_emb_dim, use_bias=False, dtype=tf.float32,
                 kernel_initializer=MSRInitializer()
             )
         else:
