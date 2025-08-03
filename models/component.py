@@ -51,10 +51,7 @@ class InterpolativeDownsampler(keras.layers.Layer):
         self.kernel = create_lowpass_kernel(filter_weights, inplace=False)
         self.filter_radius = len(filter_weights) // 2
 
-    def call(self, x):
-        # x: (batch, channels, height, width) -> TensorFlow expects (batch, height, width, channels)
-        x = tf.transpose(x, [0, 2, 3, 1])
-        
+    def call(self, x):        
         batch_size, height, width, channels = tf.unstack(tf.shape(x))
         x_reshaped = tf.reshape(x, [batch_size * channels, height, width, 1])
         
@@ -78,7 +75,6 @@ class InterpolativeDownsampler(keras.layers.Layer):
         
         # Reshape back to original batch structure
         y = tf.reshape(y, [batch_size, height // 2, width // 2, channels])
-        y = tf.transpose(y, [0, 3, 1, 2])  # Back to (batch, channels, height, width)
         return y
 
 class InplaceUpsampler(keras.layers.Layer):
