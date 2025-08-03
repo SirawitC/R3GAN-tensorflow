@@ -1,5 +1,5 @@
 import tensorflow as tf
-from trainer import AdversarialTrainer
+from training.trainer import AdversarialTrainer
 from models.generator import Generator
 from models.discriminator import Discriminator
 from tensorflow.keras.datasets import cifar10
