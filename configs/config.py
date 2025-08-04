@@ -22,3 +22,5 @@ LR_D = 1e-8
 
 BETA_1 = 0
 BETA_2 = 0
+
+IMAGES_PER_EPOCH = 100
