@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow import keras
-from component import UpsampleLayer, ResidualBlock, MSRInitializer, Convolution
+from models.component import UpsampleLayer, ResidualBlock, MSRInitializer, Convolution
 
 class GenerativeBasis(keras.layers.Layer):
     def __init__(self, output_channels):
@@ -56,11 +56,11 @@ class GeneratorStage(keras.layers.Layer):
                     kernel_size, variance_scaling
                 )
             )
+        self.main_layers = keras.Sequential(self.layers)
 
     def call(self, x):
         x = tf.cast(x, tf.float32)
-        for layer in self.layers:
-            x = layer(x)
+        x = self.main_layers(x)
         return x
     
 class Generator(keras.Model):
@@ -106,7 +106,7 @@ class Generator(keras.Model):
                     resampling_filter,
                 )
             )
-        self.main_layers = main_layers
+        self.main_layers = keras.Sequential(main_layers)
         self.aggregation_layer = Convolution(width_per_stage[-1], 3, kernel_size=1)
 
         if cond_dim is not None and cond_emb_dim > 0:
@@ -121,6 +121,5 @@ class Generator(keras.Model):
         if self.embedding_layer is not None and y is not None:
             y_emb = self.embedding_layer(y)
             x = tf.concat([x, y_emb], axis=-1)
-        for layer in self.main_layers:
-            x = layer(x)
-        return
+        x = self.main_layers(x)
+        return self.aggregation_layer(x)

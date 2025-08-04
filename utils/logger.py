@@ -234,3 +234,15 @@ class TrainingLogger:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit."""
         self.close()
+
+def create_logger(run_dir):
+    """
+    Create a training logger instance.
+    
+    Args:
+        run_dir (str): Directory to save log files
+        
+    Returns:
+        TrainingLogger: Logger instance
+    """
+    return TrainingLogger(run_dir)

@@ -16,34 +16,66 @@ class InterpolativeUpsampler(keras.layers.Layer):
     def __init__(self, filter_weights):
         super().__init__()
         self.kernel = create_lowpass_kernel(filter_weights, inplace=False)
-        self.filter_radius = len(filter_weights) // 2
+        self.built_flag = False
+
+    def build(self, input_shape):
+        _, h, w, c = input_shape  # batch_size, height, width, channels
+        k = self.kernel.shape[0]
+
+        self.conv_transpose = keras.layers.Conv2DTranspose(
+            filters=1,  # we'll reshape anyway
+            kernel_size=k,
+            strides=2,
+            padding='same',
+            use_bias=False
+        )
+        self.conv_transpose.build((None, h, w, 1))  # force build
+        kernel = 4 * tf.expand_dims(tf.expand_dims(self.kernel, -1), -1)  # (k, k, 1, 1)
+        kernel = tf.cast(kernel, tf.float32)
+        self.conv_transpose.set_weights([kernel])
+        self.built_flag = True
 
     def call(self, x):
-        batch_size, height, width, channels = tf.unstack(tf.shape(x))
-        x_reshaped = tf.reshape(x, [batch_size * channels, height, width, 1])
+        batch_size, h, w, c = tf.unstack(tf.shape(x))
+        x = tf.reshape(x, [batch_size * c, h, w, 1])
+        x = self.conv_transpose(x)
+        x = tf.reshape(x, [batch_size, h * 2, w * 2, c])
+        return x
+
+
+
+# class InterpolativeUpsampler(keras.layers.Layer):
+#     def __init__(self, filter_weights):
+#         super().__init__()
+#         self.kernel = create_lowpass_kernel(filter_weights, inplace=False)
+#         self.filter_radius = len(filter_weights) // 2
+
+#     def call(self, x):
+#         batch_size, height, width, channels = x.shape
+#         x_reshaped = tf.reshape(x, [batch_size * channels, height, width, 1])
         
-        # Create kernel with correct shape for conv_transpose2d: (h, w, output_channels, input_channels)
-        kernel = 4 * tf.expand_dims(tf.expand_dims(self.kernel, -1), -1)  # (h, w, 1, 1)
-        kernel = tf.cast(kernel, tf.float32)
+#         # Create kernel with correct shape for conv_transpose2d: (h, w, output_channels, input_channels)
+#         kernel = 4 * tf.expand_dims(tf.expand_dims(self.kernel, -1), -1)  # (h, w, 1, 1)
+#         kernel = tf.cast(kernel, tf.float32)
         
-        # Apply padding manually to match PyTorch's padding behavior
-        padded_x = tf.pad(x_reshaped, 
-                         [[0, 0], [self.filter_radius, self.filter_radius], 
-                          [self.filter_radius, self.filter_radius], [0, 0]], 
-                         "CONSTANT")
+#         # Apply padding manually to match PyTorch's padding behavior
+#         padded_x = tf.pad(x_reshaped, 
+#                          [[0, 0], [self.filter_radius, self.filter_radius], 
+#                           [self.filter_radius, self.filter_radius], [0, 0]], 
+#                          "CONSTANT")
+
+#         # Transposed convolution with stride 2
+#         y = tf.nn.conv2d_transpose(
+#             padded_x, 
+#             kernel,
+#             output_shape=[batch_size * channels, height * 2, width * 2, 1],
+#             strides=[1, 2, 2, 1],
+#             padding='VALID'
+#         )
         
-        # Transposed convolution with stride 2
-        y = tf.nn.conv2d_transpose(
-            padded_x, 
-            kernel,
-            output_shape=[batch_size * channels, height * 2, width * 2, 1],
-            strides=[1, 2, 2, 1],
-            padding='VALID'
-        )
-        
-        # Reshape back to original batch structure
-        y = tf.reshape(y, [batch_size, height * 2, width * 2, channels])
-        return y
+#         # Reshape back to original batch structure
+#         y = tf.reshape(y, [batch_size, height * 2, width * 2, channels])
+#         return y
 
 class InterpolativeDownsampler(keras.layers.Layer):
     def __init__(self, filter_weights):
@@ -52,7 +84,7 @@ class InterpolativeDownsampler(keras.layers.Layer):
         self.filter_radius = len(filter_weights) // 2
 
     def call(self, x):        
-        batch_size, height, width, channels = tf.unstack(tf.shape(x))
+        batch_size, height, width, channels = x.shape
         x_reshaped = tf.reshape(x, [batch_size * channels, height, width, 1])
         
         # Create kernel with correct shape: (h, w, input_channels, output_channels)

@@ -1,2 +1,5 @@
 env
 .gitignore
+test*.py
+__pycache__
+runs

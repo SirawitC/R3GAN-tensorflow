@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow import keras
-from component import DownsampleLayer, ResidualBlock, MSRInitializer, Convolution
+from models.component import DownsampleLayer, ResidualBlock, MSRInitializer, Convolution
 import math
 
 class DiscriminativeBasis(keras.layers.Layer):
@@ -49,10 +49,11 @@ class DiscriminatorStage(keras.layers.Layer):
             ResidualBlock(input_channels, cardinality, expansion_factor, kernel_size, variance_scaling) for _ in range(num_blocks)
         ] + [transition_layer]
 
+        self.main_layers = keras.Sequential(self.layers)
+
     def call(self, x):
         x = tf.cast(x, tf.float32)
-        for layer in self.layers:
-            x = layer(x)
+        x = self.main_layers(x)
         return x
 
 class Discriminator(keras.layers.Layer):
@@ -80,7 +81,6 @@ class Discriminator(keras.layers.Layer):
                 kernel_size,
                 variance_scaling,
                 resampling_filter,
-                dtype=tf.float32
             )
             for x in range(len(width_per_stage) - 1)
         ]
@@ -94,10 +94,9 @@ class Discriminator(keras.layers.Layer):
                 kernel_size,
                 variance_scaling,
                 None,
-                dtype=tf.float32
             )
         )
-        self.main_layers = main_layers
+        self.main_layers = keras.Sequential(main_layers)
         self.extraction_layer = Convolution(3, width_per_stage[0], kernel_size=1)
 
         if cond_dim is not None and cond_emb_dim > 0:
@@ -110,11 +109,10 @@ class Discriminator(keras.layers.Layer):
 
     def call(self, x, y=None):
         x = self.extraction_layer(tf.cast(x, tf.float32))
-        for layer in self.main_layers:
-            x = layer(x)
+        x = self.main_layers(x)
         if self.embedding_layer is not None and y is not None:
             y_emb = self.embedding_layer(y)
             # Expand y_emb to match x's spatial dims for broadcasting
             y_emb = tf.expand_dims(tf.expand_dims(y_emb, axis=1), axis=1)
             x = tf.reduce_sum(x * y_emb, axis=[1, 2], keepdims=True)
-        return tf.squeeze(x, axis=[1, 2, -1])
+        return tf.squeeze(x, axis=[1, 2])
