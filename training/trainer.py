@@ -1,4 +1,5 @@
 import tensorflow as tf
+from configs.config import *
 
 class AdversarialTrainer:
     def __init__(self, generator, discriminator, g_optimizer, d_optimizer):
@@ -46,7 +47,7 @@ class AdversarialTrainer:
             R2_penalty = self.zero_centered_gradient_penalty(tape, fake_images, fake_logits)
             gp_total = tf.multiply(0.5, tf.add(R1_penalty, R2_penalty))
 
-            loss = tf.multiply(scale, tf.reduce_mean(tf.add(tf.reshape(tf.multiply(gamma, gp_total), (4, 1)), adversarial_loss)))
+            loss = tf.multiply(scale, tf.reduce_mean(tf.add(tf.reshape(tf.multiply(gamma, gp_total), (BATCH_SIZE, 1)), adversarial_loss)))
 
         grads = tape.gradient(loss, self.discriminator.trainable_variables)
         self.d_optimizer.apply_gradients(zip(grads, self.discriminator.trainable_variables))
