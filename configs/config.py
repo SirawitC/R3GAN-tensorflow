@@ -1,5 +1,5 @@
 # Generator and Discriminator Initialization
-WIDTH_PER_STAGE_G = [3 * x // 4 for x in [256, 256, 256, 256]]
+WIDTH_PER_STAGE_G = [3 * x // 4 for x in [1024, 1024, 1024, 1024]]
 BLOCKS_PER_STAGE_G = [2 * x for x in [1, 1, 1, 1]]
 CARDINALITY_PER_STAGE_G = [3 * x for x in [32, 32, 32, 32]]
 NOISE_DIMENSION_G = 64
