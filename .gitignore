@@ -3,4 +3,3 @@ env
 test*.py
 __pycache__
 runs
-*.ipynb
