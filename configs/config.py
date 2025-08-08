@@ -1,5 +1,5 @@
 # Generator and Discriminator Initialization
-WIDTH_PER_STAGE_G = [3 * x // 4 for x in [1024, 1024, 1024, 1024]]
+WIDTH_PER_STAGE_G = [3 * x // 4 for x in [256, 256, 256, 256]]
 BLOCKS_PER_STAGE_G = [2 * x for x in [1, 1, 1, 1]]
 CARDINALITY_PER_STAGE_G = [3 * x for x in [32, 32, 32, 32]]
 NOISE_DIMENSION_G = 64
@@ -16,9 +16,9 @@ CONDITION_EMBEDDING_DIM_D = WIDTH_PER_STAGE_G[0]
 
 # Training Hyperparameters
 NUM_EPOCHS = 1000
-BATCH_SIZE = 16
-LR_G = 1e-8
-LR_D = 1e-8
+BATCH_SIZE = 32
+LR_G = 2e-6
+LR_D = 2e-6
 
 BETA_1 = 0
 BETA_2 = 0
