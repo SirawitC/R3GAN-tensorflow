@@ -2,8 +2,6 @@
 
 An unofficial TensorFlow implementation of the **R3GAN** (["The GAN is dead; long live the GAN! A Modern GAN Baseline"](https://arxiv.org/abs/2501.05441)) model—a modern, simplified GAN baseline introduced in a NeurIPS 2024 paper. The official code, implemented in PyTorch by the authors of the R3GAN paper, is also publicly available in this [repo](https://github.com/brownvc/R3GAN). 
 
----
-
 ##  Project Overview
 
 This repository recasts R3GAN in TensorFlow, providing:
@@ -12,8 +10,6 @@ This repository recasts R3GAN in TensorFlow, providing:
 - Core modules for configuration, modeling, training, and utilities.
 - Support for both notebook-based exploratory work (`train.ipynb`) and script-driven training (`train.py`).
 - Reduce the dependency on external custom library (only require tensorflow).
-
----
 
 ##  Repository Structure
 
@@ -24,8 +20,6 @@ This repository recasts R3GAN in TensorFlow, providing:
 - `train.ipynb`: Interactive notebook for experiment tinkering.
 - `train.py`: Python script for running the training sessions.
 - `tb.py`: TensorBoard integration for real-time monitoring.
-
----
 
 ##  Getting Started
 
@@ -59,15 +53,11 @@ This repository recasts R3GAN in TensorFlow, providing:
  * Output models, samples, and logs will be saved based on configured directories.
  * Visualize training and sample outputs via TensorBoard.
 
----
-
 ## Highlights & Features
 
 * Modular code architecture for clarity and flexibility.
 * Dual interface: interactive notebook and script-based workflows.
 * TensorBoard support for live monitoring.
-
----
 
 ## Contributing
 
@@ -76,17 +66,12 @@ This repository recasts R3GAN in TensorFlow, providing:
 3. Commit your changes and push them.
 4. Open a Pull Request for review.
 
----
-
 ## License & Acknowledgments
 
 This code is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
-
----
 
 ## Authors
 
 * [**Sorawit Chokphantavee**](https://github.com/SorawitChok)
 * [**Sirawit Chokphantavee**](https://github.com/SirawitC)
 
----
