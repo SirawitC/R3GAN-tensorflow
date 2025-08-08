@@ -66,7 +66,7 @@ This repository recasts R3GAN in TensorFlow, providing:
 3. Commit your changes and push them.
 4. Open a Pull Request for review.
 
-## License & Acknowledgments
+## License
 
 This code is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
 
