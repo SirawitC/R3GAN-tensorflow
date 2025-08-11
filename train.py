@@ -15,12 +15,16 @@ def train_step(real_images, conditions, noise_dim):
     noise = tf.random.normal([batch_size, noise_dim])
 
     # Train Discriminator
+    d_start = time.time()
     disc_loss, r1_pen, r2_pen = trainer.train_discriminator(noise, real_images, conditions)
+    d_time = time.time() - d_start
 
     # Train Generator
+    g_start = time.time()
     gen_loss = trainer.train_generator(noise, real_images, conditions)
+    g_time = time.time() - g_start
 
-    return gen_loss, disc_loss, r1_pen, r2_pen
+    return gen_loss, disc_loss, r1_pen, r2_pen, d_time, g_time
 
 # Create models
 generator = Generator(NOISE_DIMENSION_G, WIDTH_PER_STAGE_G, CARDINALITY_PER_STAGE_G, 
@@ -138,18 +142,11 @@ try:
         for real_images, conditions in train_dataset:
             batch_start_time = time.time()
             
-            # Training step with timing
-            step_start = time.time()
-            gen_loss, disc_loss, r1, r2 = train_step(real_images, conditions, NOISE_DIMENSION_G)
+            gen_loss, disc_loss, r1, r2, d_time, g_time = train_step(real_images, conditions, NOISE_DIMENSION_G)
             print("gen_loss", gen_loss)
             print("disc_loss", disc_loss)
             print("r1", r1)
             print("r2", r2)
-            step_time = time.time() - step_start
-            
-            # Approximate D and G times (you might want to separate these in your trainer)
-            d_time = step_time * 0.6  # Approximate discriminator time
-            g_time = step_time * 0.4  # Approximate generator time
             
             d_times.append(d_time)
             g_times.append(g_time)
