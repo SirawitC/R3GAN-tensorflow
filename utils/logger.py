@@ -193,7 +193,7 @@ class TrainingLogger:
         else:
             self.stats_metrics.update(result_dict)
     
-    def log_images(self, images, step, tag="generated_images", max_outputs=8):
+    def log_images(self, images, step, tag="generated_images", max_outputs=10):
         """
         Log images to TensorBoard.
         

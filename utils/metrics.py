@@ -10,7 +10,7 @@ _inception_fast = InceptionV3(include_top=False, pooling='avg', input_shape=(299
 # Inception for IS computation (with classification head)
 _inception_classifier = InceptionV3(include_top=True, weights='imagenet')
 
-def _extract_features(images, batch_size=32, method="standard"):
+def _extract_features(images, batch_size=16, method="standard"):
     """
     Extract features from InceptionV3 for FID computation.
 
@@ -43,7 +43,7 @@ def _extract_features(images, batch_size=32, method="standard"):
 
     return feats.numpy()
 
-def calculate_fid(real_images, fake_images, batch_size=32, method="standard"):
+def calculate_fid(real_images, fake_images, batch_size=16, method="standard"):
     """
     Compute Frechet Inception Distance between real and generated images.
     """
@@ -61,7 +61,7 @@ def calculate_fid(real_images, fake_images, batch_size=32, method="standard"):
     fid = diff.dot(diff) + np.trace(sigma1 + sigma2 - 2 * covmean)
     return float(fid)
 
-def calculate_inception_score(images, batch_size=32, splits=10):
+def calculate_inception_score(images, batch_size=16, splits=10):
     """
     Compute Inception Score (mean, std) for generated images in [0,1] or [0,255].
     """
