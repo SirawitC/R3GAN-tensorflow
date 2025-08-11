@@ -10,12 +10,12 @@ from utils.logger import create_logger
 from tqdm import tqdm 
 
 @tf.function
-def train_step(real_images, conditions, noise_dim, gamma=10.0):
+def train_step(real_images, conditions, noise_dim):
     batch_size = tf.shape(real_images)[0]
     noise = tf.random.normal([batch_size, noise_dim])
 
     # Train Discriminator
-    disc_loss, r1_pen, r2_pen = trainer.train_discriminator(noise, real_images, conditions, gamma)
+    disc_loss, r1_pen, r2_pen = trainer.train_discriminator(noise, real_images, conditions)
 
     # Train Generator
     gen_loss = trainer.train_generator(noise, real_images, conditions)
@@ -36,6 +36,8 @@ total_steps = int((NUM_EPOCHS * IMAGES_PER_EPOCH) / BATCH_SIZE)
 alpha_g = FIN_LR_G / INIT_LR_G
 alpha_d = FIN_LR_D / INIT_LR_D
 
+alpha_beta_2 = INIT_BETA_2 / FIN_BETA_2
+
 g_lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
     initial_learning_rate=INIT_LR_G,
     decay_steps=total_steps,
@@ -48,19 +50,35 @@ d_lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
     alpha=alpha_d
 )
 
+beta_2_scheduler = tf.keras.optimizers.schedules.CosineDecay(
+    initial_learning_rate=INIT_BETA_2,
+    decay_steps=total_steps,
+    alpha=alpha_d
+)
+
 g_optimizer = tf.keras.optimizers.Adam(
     learning_rate=g_lr_schedule, 
     beta_1=BETA_1, 
-    beta_2=BETA_2
+    beta_2=beta_2_scheduler,
+    epsilon=1e-8
 )
+
 d_optimizer = tf.keras.optimizers.Adam(
     learning_rate=d_lr_schedule, 
     beta_1=BETA_1, 
-    beta_2=BETA_2
+    beta_2=beta_2_scheduler,
+    epsilon=1e-8
+)
+
+# Cosine decay for gamma (R1/R2 penalty strength)
+gamma_schedule = tf.keras.optimizers.schedules.CosineDecay(
+    initial_learning_rate=INIT_GAMMA,               
+    decay_steps=total_steps,
+    alpha=FIN_GAMMA / INIT_GAMMA                       
 )
 
 # Create trainer
-trainer = AdversarialTrainer(generator, discriminator, g_optimizer, d_optimizer)
+trainer = AdversarialTrainer(generator, discriminator, g_optimizer, d_optimizer, gamma_schedule)
 
 # Setup logging
 run_dir = f"runs/gan_training_{int(time.time())}"
@@ -104,7 +122,7 @@ y_train = tf.keras.utils.to_categorical(y_train, CONDITION_DIM)
 
 train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
 
-train_dataset = train_dataset.shuffle(10000).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+train_dataset = train_dataset.shuffle(50000).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
 
 try:    
     for epoch in tqdm(range(NUM_EPOCHS)):
@@ -182,7 +200,7 @@ try:
                 maintenance_time=maintenance_time,
                 cur_lr=float(g_optimizer.learning_rate),
                 cur_ema_nimg=cur_nimg * 0.5,  # Approximate EMA parameter
-                cur_beta2=BETA_2,
+                cur_beta2=float(g_optimizer.beta_2),
                 cur_gamma=10.0,  # R1/R2 penalty weight
                 augment_p=0.0,  # Set augmentation probability if used
                 phase_times={'D': avg_d_time, 'G': avg_g_time}
@@ -194,7 +212,7 @@ try:
             # Generate and log sample images
             if cur_tick % image_snapshot_ticks == 0:
                 try:
-                    generated_images = generator(fixed_noise, fixed_conditions, training=False)
+                    generated_images = trainer.generator_ema(fixed_noise, fixed_conditions, training=False)
                     logger.log_images(generated_images, step=cur_nimg//1000, tag="generated_samples")
                 except Exception as e:
                     print(f"Warning: Could not log images: {e}")
@@ -204,7 +222,7 @@ try:
                 try:
                     checkpoint_dir = os.path.join(run_dir, f"checkpoint_{cur_nimg//1000:06d}")
                     os.makedirs(checkpoint_dir, exist_ok=True)
-                    generator.save_weights(os.path.join(checkpoint_dir, "generator"))
+                    trainer.generator_ema.save_weights(os.path.join(checkpoint_dir, "generator"))
                     discriminator.save_weights(os.path.join(checkpoint_dir, "discriminator"))
                     print(f"Saved checkpoint at {checkpoint_dir}")
                 except Exception as e:
