@@ -1,12 +1,34 @@
 import tensorflow as tf
 from configs.config import *
+import numpy as np
 
+def ema_decay_from_half_life(step):
+        hl_mimg = 0.5 * (1 - tf.cos(np.pi * step / TOTAL_STEPS)) * FIN_EMA_MIMG 
+
+        # convert to images
+        hl_images = hl_mimg * 1e6
+        images_per_step = BATCH_SIZE
+
+        # decay formula
+        decay = tf.pow(0.5, images_per_step / tf.maximum(hl_images, 1.0))
+        return decay
 class AdversarialTrainer:
-    def __init__(self, generator, discriminator, g_optimizer, d_optimizer):
+    def __init__(self, generator, discriminator, g_optimizer, d_optimizer, gamma_schedule):
         self.generator = generator
         self.discriminator = discriminator
         self.g_optimizer = g_optimizer
         self.d_optimizer = d_optimizer
+        self.gamma_schedule = gamma_schedule
+        self.step = tf.Variable(0, dtype=tf.int64, trainable=False)
+
+        # EMA generator weights
+        self.generator_ema = tf.keras.models.clone_model(generator)
+        self.generator_ema.set_weights(generator.get_weights())
+    
+    def update_generator_ema(self):
+        decay = ema_decay_from_half_life(tf.cast(self.step, tf.float32))
+        for w_ema, w in zip(self.generator_ema.weights, self.generator.weights):
+            w_ema.assign(w_ema * decay + w * (1.0 - decay))
 
     @staticmethod
     def zero_centered_gradient_penalty(tape, x, logits):
@@ -26,11 +48,15 @@ class AdversarialTrainer:
 
         grads = tape.gradient(loss, self.generator.trainable_variables)
         self.g_optimizer.apply_gradients(zip(grads, self.generator.trainable_variables))
+        self.update_generator_ema()
         return tf.stop_gradient(loss)
 
-    def train_discriminator(self, noise, real_images, conditions, gamma=10.0, scale=1.0, preprocessor=lambda x: x):
+    def train_discriminator(self, noise, real_images, conditions, scale=1.0, preprocessor=lambda x: x):
         real_images = tf.cast(real_images, tf.float32)
         real_images = tf.convert_to_tensor(real_images)
+
+        # Get gamma for this step
+        gamma = self.gamma_schedule(self.step)
 
         with tf.GradientTape(persistent=True) as tape:
             tape.watch(real_images)
@@ -51,4 +77,8 @@ class AdversarialTrainer:
 
         grads = tape.gradient(loss, self.discriminator.trainable_variables)
         self.d_optimizer.apply_gradients(zip(grads, self.discriminator.trainable_variables))
+
+        # Increment step
+        self.step.assign_add(1)
+
         return tf.stop_gradient(loss), tf.stop_gradient(R1_penalty), tf.stop_gradient(R2_penalty)
