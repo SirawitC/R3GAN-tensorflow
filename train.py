@@ -29,8 +29,36 @@ discriminator = Discriminator(WIDTH_PER_STAGE_D, CARDINALITY_PER_STAGE_D, BLOCKS
                              EXPANSION_FACTOR, CONDITION_DIM, CONDITION_EMBEDDING_DIM_D)
 
 # Create optimizers
-g_optimizer = tf.keras.optimizers.Adam(LR_G, BETA_1, BETA_2)
-d_optimizer = tf.keras.optimizers.Adam(LR_D, BETA_1, BETA_2)
+total_steps = int((NUM_EPOCHS * IMAGES_PER_EPOCH) / BATCH_SIZE)
+
+# Cosine decay goes from initial_lr -> alpha * initial_lr
+# To match final_lr exactly, set alpha = final_lr / initial_lr
+alpha_g = FIN_LR_G / INIT_LR_G
+alpha_d = FIN_LR_D / INIT_LR_D
+
+g_lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
+    initial_learning_rate=INIT_LR_G,
+    decay_steps=total_steps,
+    alpha=alpha_g
+)
+
+d_lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
+    initial_learning_rate=INIT_LR_D,
+    decay_steps=total_steps,
+    alpha=alpha_d
+)
+
+# Adam with β₂ ramp handled separately if needed
+g_optimizer = tf.keras.optimizers.Adam(
+    learning_rate=g_lr_schedule, 
+    beta_1=BETA_1, 
+    beta_2=BETA_2
+)
+d_optimizer = tf.keras.optimizers.Adam(
+    learning_rate=d_lr_schedule, 
+    beta_1=BETA_1, 
+    beta_2=BETA_2
+)
 
 # Create trainer
 trainer = AdversarialTrainer(generator, discriminator, g_optimizer, d_optimizer)
