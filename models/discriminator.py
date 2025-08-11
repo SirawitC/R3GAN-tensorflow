@@ -56,7 +56,7 @@ class DiscriminatorStage(keras.layers.Layer):
         x = self.main_layers(x)
         return x
 
-class Discriminator(keras.layers.Layer):
+class Discriminator(keras.Model):
     def __init__(
         self,
         width_per_stage,
