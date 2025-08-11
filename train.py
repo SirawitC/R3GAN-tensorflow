@@ -48,7 +48,6 @@ d_lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
     alpha=alpha_d
 )
 
-# Adam with β₂ ramp handled separately if needed
 g_optimizer = tf.keras.optimizers.Adam(
     learning_rate=g_lr_schedule, 
     beta_1=BETA_1, 
@@ -85,10 +84,10 @@ tick_start_time = start_time
 maintenance_time = 0.0
 
 # Fixed noise for consistent image generation
-num_samples = 16
+num_samples = 10
 fixed_noise = tf.random.normal([num_samples, NOISE_DIMENSION_G])
 # Create fixed conditions (you may need to adjust this based on your condition format)
-fixed_conditions = tf.zeros([num_samples, CONDITION_DIM])  # Modify as needed
+fixed_conditions = tf.eye(num_samples, CONDITION_DIM)  # Modify as needed
 
 print(f"Starting training for {NUM_EPOCHS} epochs ({total_kimg} kimg total)")
 print(f"Logging to: {run_dir}")
