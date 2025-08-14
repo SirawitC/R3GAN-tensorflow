@@ -149,6 +149,21 @@ class TrainingLogger:
                 loss_value = float(loss_value)
             
             self.current_stats[f'Loss/{loss_name}'] = loss_value
+
+    def log_metrics(self, **metrics):
+        """
+        Log metrics (FID, IS) values.
+        
+        Args:
+            **metrics: Keyword arguments containing metrics names and values
+        """
+        for metrics_name, metrics_value in metrics.items():
+            if hasattr(metrics_value, 'numpy'):
+                metrics_value = float(metrics_value.numpy())
+            elif isinstance(metrics_value, np.ndarray):
+                metrics_value = float(metrics_value)
+
+            self.stats_metrics[f'Metrics/{metrics_name}'] = metrics_value
     
     def update_logs(self, cur_nimg, start_time):
         """

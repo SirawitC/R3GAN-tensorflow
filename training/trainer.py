@@ -22,8 +22,11 @@ class AdversarialTrainer:
         self.step = tf.Variable(0, dtype=tf.int64, trainable=False)
 
         # EMA generator weights
-        self.generator_ema = tf.keras.models.clone_model(generator)
-        self.generator_ema.set_weights(generator.get_weights())
+        self.generator_ema = tf.keras.models.clone_model(self.generator)
+        dummy_noise = tf.zeros([1, NOISE_DIMENSION_G])
+        dummy_condition = tf.zeros([1, CONDITION_DIM])
+        _ = self.generator_ema(dummy_noise, dummy_condition, training=False)
+        self.generator_ema.set_weights(self.generator.get_weights())
     
     def update_generator_ema(self):
         decay = ema_decay_from_half_life(tf.cast(self.step, tf.float32))
